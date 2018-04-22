@@ -1,0 +1,10 @@
+{
+    "discourse": {
+        "site": "https://example.com",
+        "username": "USERNAME_OF_BOT",
+        "api_key": ""
+    },
+    "discord": {
+        "token": "DISCORD_BOT_TOKEN"
+    }
+}
