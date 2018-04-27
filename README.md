@@ -43,12 +43,7 @@ $ chmod +x bot.py
 $ ./bot.py
 ```
 
-To-Do:
-------
-
-* Broadcast updates from Clockwork team on Discourse community forum
-
 Features:
 ---------
 
-Coming soon!
+* Broadcast updates from Clockwork team on Discourse community forum (from the [GameShell Updates](https://forum.clockworkpi.com/t/gameshell-updates/257) thread)
