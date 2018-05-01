@@ -46,4 +46,4 @@ $ ./bot.py
 Features:
 ---------
 
-* Broadcast updates from Clockwork team on Discourse community forum (from the [GameShell Updates](https://forum.clockworkpi.com/t/gameshell-updates/257) thread)
+* Broadcast updates from Clockwork team on Discourse community forum when #update or #announcement is used

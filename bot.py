@@ -80,23 +80,32 @@ async def discourse_daemon(bot, client, wait):
     update_id, update_slug = 257, "gameshell-updates"
     date_format = lambda _: datetime.strptime(_, "%Y-%m-%dT%H:%M:%S.%fZ")
     get_timestamp = lambda _: date_format(_).timestamp()
-    # watch_lastest = [client.user(w)[latest] for w in watch]
-    # watch_timestamps = [get_timestamp(wl) for wl in watch_lastest]
-    update_topic = client.topic(topic_id=update_id, slug=update_slug)
-    topic_timestamp = get_timestamp(update_topic[latest])
-    time_since = now - topic_timestamp + adjust_timezone
-    all_posts = update_topic["post_stream"]["posts"]
-    last_post = all_posts[-1]
-    post_username = last_post["username"]
     
-    if time_since <= wait and post_username in watch:
-        message = re.sub(r"<(.*?)>", "", last_post["cooked"])
-        post_number = last_post["post_number"]
-        link_tuple = (discourse_site, update_slug, update_id, post_number)
-        link = "%st/%s/%s/%s" % link_tuple
-        post_message = "%s: %s [%s]" % (post_username, message, link)
-        print(post_message)
-        await bot.send_message(bot.general_channel, post_message)
+    topics = client.latest_topics()["topic_list"]["topics"]
+    latest_topics = list()
+    for topic in topics:
+        topic_timestamp = get_timestamp(topic[latest])
+        time_since = now - topic_timestamp + adjust_timezone
+        if time_since <= wait:
+            topic_id = topic["id"]
+            slug = topic["slug"]
+            update_topic = client.topic(topic_id=topic_id, slug=slug)
+            all_posts = update_topic["post_stream"]["posts"]
+            last_post = all_posts[-1]
+            post_username = last_post["username"]
+            if post_username in watch:
+                message = re.sub(r"<(.*?)>", "", last_post["cooked"])
+                if "#update" not in message and "#announcement" not in message:
+                    continue
+                
+                post_number = last_post["post_number"]
+                link_tuple = (discourse_site, slug, topic_id, post_number)
+                link = "%st/%s/%s/%s" % link_tuple
+                post_message = "%s: %s [%s]" % (post_username, message, link)
+                print(int(now), post_message)
+                await bot.send_message(bot.general_channel, post_message)
+                
+    # if time_since <= wait and post_username in watch:
 
 @bot.event
 async def on_ready():
