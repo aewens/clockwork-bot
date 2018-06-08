@@ -73,37 +73,34 @@ async def every(delay, task, loop, **kwargs):
 async def discourse_daemon(bot, client, wait):
     watch = ["yong", "hal"]
     latest = "last_posted_at"
+    created = "created_at"
     # Adjust this according to where your server is located
     adjust_timezone = 5 * 60 * 60
     now = datetime.now().timestamp()
-    get_username = "last_poster_username"
     update_id, update_slug = 257, "gameshell-updates"
     date_format = lambda _: datetime.strptime(_, "%Y-%m-%dT%H:%M:%S.%fZ")
     get_timestamp = lambda _: date_format(_).timestamp()
     
     topics = client.latest_topics()["topic_list"]["topics"]
-    latest_topics = list()
-    for topic in topics:
-        topic_timestamp = get_timestamp(topic[latest])
+    update_topics = [topic for topic in topics if "update" in topic["tags"]]
+    for topic in update_topics:
+        topic_timestamp = get_timestamp(topic[created])
         time_since = now - topic_timestamp + adjust_timezone
         if time_since <= wait:
             topic_id = topic["id"]
             slug = topic["slug"]
             update_topic = client.topic(topic_id=topic_id, slug=slug)
             all_posts = update_topic["post_stream"]["posts"]
-            last_post = all_posts[-1]
-            post_username = last_post["username"]
+            first_post = all_posts[0]
+            post_username = first_post["username"]
             if post_username in watch:
-                message = re.sub(r"<(.*?)>", "", last_post["cooked"])
-                if "#update" not in message and "#announcement" not in message:
-                    continue
-                
-                post_number = last_post["post_number"]
+                message = re.sub(r"<(.*?)>", "", first_post["cooked"])
+                post_number = first_post["post_number"]
                 link_tuple = (discourse_site, slug, topic_id, post_number)
                 link = "%st/%s/%s/%s" % link_tuple
                 post_message = "%s: %s [%s]" % (post_username, message, link)
                 print(int(now), post_message)
-                await bot.send_message(bot.general_channel, post_message)
+                await bot.send_message(bot.news_channel, post_message)
                 
     # if time_since <= wait and post_username in watch:
 
@@ -114,8 +111,8 @@ async def on_ready():
     print(bot.user.id)
     print("="*max(len(bot.user.name), len(bot.user.id)))
     for channel in bot.get_all_channels():
-        if str(channel) == "general":
-            setattr(bot, "general_channel", channel)
+        if str(channel) == "news":
+            setattr(bot, "news_channel", channel)
     
     minutes = lambda m: m * 60
     delay = minutes(1)
