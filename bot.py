@@ -6,8 +6,10 @@ import sys
 import json
 import traceback
 import threading
+from random import randint 
 from time import time, sleep
 from datetime import datetime
+from operator import itemgetter
 
 # Third-party packages
 import discord
@@ -60,17 +62,7 @@ discourse_client = DiscourseClient(
     api_key=discourse_api_key
 )
 
-async def every(delay, task, loop, **kwargs):
-    next_time = loop.time() + delay
-    while True:
-        await asyncio.sleep(max(0, next_time - loop.time()))
-        try:
-            await task(**kwargs)
-        except Exception:
-            traceback.print_exc()
-        next_time = loop.time() + delay
-
-async def discourse_daemon(bot, client, wait):
+def get_news(bot, client):
     watch = ["yong", "hal"]
     latest = "last_posted_at"
     created = "created_at"
@@ -83,52 +75,54 @@ async def discourse_daemon(bot, client, wait):
     
     topics = client.latest_topics()["topic_list"]["topics"]
     update_topics = [topic for topic in topics if "update" in topic["tags"]]
+    topic_list = list()
     for topic in update_topics:
         topic_timestamp = get_timestamp(topic[created])
         time_since = now - topic_timestamp + adjust_timezone
-        if time_since <= wait:
-            topic_id = topic["id"]
-            slug = topic["slug"]
-            update_topic = client.topic(topic_id=topic_id, slug=slug)
-            all_posts = update_topic["post_stream"]["posts"]
-            first_post = all_posts[0]
-            post_username = first_post["username"]
-            if post_username in watch:
-                message = re.sub(r"<(.*?)>", "", first_post["cooked"])
-                post_number = first_post["post_number"]
-                link_tuple = (discourse_site, slug, topic_id, post_number)
-                link = "%st/%s/%s/%s" % link_tuple
-                post_message = "%s: %s [%s]" % (post_username, message, link)
-                print(int(now), post_message)
-                await bot.send_message(bot.news_channel, post_message)
-                
-    # if time_since <= wait and post_username in watch:
 
+        topic_id = topic["id"]
+        slug = topic["slug"]
+        update_topic = client.topic(topic_id=topic_id, slug=slug)
+        all_posts = update_topic["post_stream"]["posts"]
+        first_post = all_posts[0]
+        post_username = first_post["username"]
+        if post_username in watch:
+            topic_list.append([time_since, first_post]) 
+    
+    most_recent = sorted(topic_list, key=itemgetter(0))[0][1]
+
+    message = re.sub(r"<(.*?)>", "", first_post["cooked"])
+    post_number = first_post["post_number"]
+    link_tuple = (discourse_site, slug, topic_id, post_number)
+    link = "%st/%s/%s/%s" % link_tuple
+    if len(message) > 1500:
+        message = "%s..." % message[:1500]
+    post_message = "%s: %s [%s]" % (post_username, message, link)
+    return post_message
+
+def get_news_channel(bot):
+    channels = bot.get_all_channels()
+    return [channel for channel in channels if str(channel) == "news"][0]
+                
 @bot.event
 async def on_ready():
     print("Logged in as:")
     print(bot.user.name)
     print(bot.user.id)
     print("="*max(len(bot.user.name), len(bot.user.id)))
-    for channel in bot.get_all_channels():
-        if str(channel) == "news":
-            setattr(bot, "news_channel", channel)
-    
-    minutes = lambda m: m * 60
-    delay = minutes(1)
-    
-    loop = asyncio.get_event_loop()
-    # DEBUG
-    asyncio.ensure_future(discourse_daemon(bot, discourse_client, delay))
-    # asyncio.ensure_future(every(
-    #     delay, discourse_daemon, loop, 
-    #     bot=bot, client=discourse_client, wait=delay
-    # ))
 
 @bot.event
 async def on_message(message):
     if message.content.startswith("!test"):
         await bot.send_message(message.channel, "Test successful!")
-    # More commands go here
+    elif message.content.startswith("!random"):
+        await bot.send_message(message.channel, "%s" % randint(0,100))
+    elif message.content.startswith("!news"):
+        roles = [str(role) for role in message.author.roles]
+        if str(message.channel) == "news":
+            if "Moderator" in roles or "News Reporter" in roles:
+                news_message = get_news(bot, discourse_client)
+                await bot.send_message(message.channel, news_message)
+        
 
 bot.run(discord_token)
